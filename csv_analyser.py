@@ -30,37 +30,53 @@ def load_csv(filepath: str) -> pd.DataFrame:
 
 def build_prompt(df: pd.DataFrame) -> str:
     """Build the prompt payload to send to Claude."""
-    stats       = df.describe(include="all").to_string()
-    dtypes      = df.dtypes.to_string()
-    null_counts = df.isnull().sum().to_string()
-    sample      = df.head(3).to_string()
+    # Sample to keep prompt size manageable
+    df_sample = df.sample(n=10000, random_state=42)
+    
+    stats           = df_sample.describe().round(2).to_string()
+    dtypes          = df.dtypes.to_string()
+    null_counts     = df.isnull().sum().to_string()
+    sample          = df.head(3).to_string()
+    top_sessions    = df.groupby('user_session').size().sort_values(ascending=False).head(5).to_string()
+    event_breakdown = df['event_type'].value_counts(normalize=True).mul(100).round(2).to_string()
+    price_outliers  = df[['price', 'brand', 'category_code']].sort_values(by='price', ascending=False).head(5).to_string()
 
-    prompt = f"""You are a senior data analyst reviewing a dataset. Here is the metadata:
-
+    prompt = f"""You are a senior data analyst reviewing an e-commerce event dataset. Here is the metadata:
+ 
 ## Column Data Types
 {dtypes}
-
+ 
 ## Null Counts Per Column
 {null_counts}
-
+ 
 ## Summary Statistics (df.describe)
 {stats}
-
+ 
 ## First 3 Rows (Sample)
 {sample}
-
+ 
+## Event Type Breakdown (% of total events)
+{event_breakdown}
+ 
+## Top 5 Sessions by Event Count (bot/outlier check)
+{top_sessions}
+ 
+## Top 5 Most Expensive Items
+{price_outliers}
+ 
 Based on this, provide:
-
-1. TOP 3 INSIGHTS — specific, business-relevant observations from the data as-is.
-   Do not hedge. State what you see clearly.
-
-2. TOP 3 RECOMMENDED ANALYSES — concrete next-step analyses worth running.
-   Each recommendation should name the method, the columns involved, and why it matters.
-
-3. DATA QUALITY FLAGS — anything suspicious: skewed distributions, high nulls,
-   unexpected value ranges, potential duplicates.
-
-Be concise. Analyst tone. No filler sentences."""
+ 
+1. TOP 3 INSIGHTS — specific, business-relevant observations.
+   For each insight: state what you see → benchmark it against e-commerce industry norms → explain why it matters → recommend one concrete action.
+   Do not hedge. No filler.
+ 
+2. TOP 3 RECOMMENDED ANALYSES — concrete next steps.
+   For each: name the method, columns involved, and the business decision it would inform.
+ 
+3. DATA QUALITY FLAGS — flag anything suspicious: high nulls, outlier sessions, unexpected value ranges, type issues.
+   For each flag: state the issue → assess severity (low/medium/high) → recommend fix.
+ 
+Analyst tone. Be specific. No generic observations."""
 
     return prompt
 
@@ -77,7 +93,7 @@ def analyse(filepath: str) -> None:
 
     message = client.messages.create(
         model=MODEL,
-        max_tokens=1000,
+        max_tokens=2000,
         system="You are a senior data analyst. Be direct, specific, and concise.",
         messages=[
             {"role": "user", "content": prompt}
