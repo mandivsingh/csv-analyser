@@ -40,12 +40,16 @@ def build_prompt(question: str) -> str:
 {question}
 
 ## Instructions
-- Write a single SQL query that answers the question completely
+- Write a single SQL query that answers the question completely - use a subquery and with clause if needed - return the output in a clean format.
+- Do not suggest follow-up analyses or add unrequested sections
 - Use NULLIF to avoid division by zero in any rate calculations
 - Include all relevant funnel stages (view, cart, purchase) where applicable
 - Add brief inline comments for any non-obvious logic
 - Format the SQL cleanly with consistent indentation
+- Give the best appropriate query which makes the most sense. 
+- For all conversion rate calculations, deduplicate at user_session level using COUNT(DISTINCT user_session). Do not switch to user_id or user-product deduplication unless explicitly asked.
 - After the query, write 2 sentences max explaining what the query returns and any assumptions made
+- If a categorical column like brand, category_code is null, then mark it as 'unknown' and include it in analysis
 
 Return the SQL query first, then the explanation. Nothing else."""
 
